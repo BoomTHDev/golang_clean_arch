@@ -5,7 +5,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/BoomTHDev/wear-pos-server/config"
+	"github.com/BoomTHDev/golang_clean_arch/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -37,7 +37,7 @@ func NewPostgresDatabase(conf *config.Database) Database {
 			panic(err)
 		}
 
-		log.Printf("Connected to database %s", conf.DBName)
+		log.Printf("Connected to database %s\n", conf.DBName)
 
 		postgresDatabaseInstance = &postgresDatabase{conn}
 	})

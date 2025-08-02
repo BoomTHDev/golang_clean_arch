@@ -2,52 +2,70 @@ package server
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/BoomTHDev/wear-pos-server/config"
-	"github.com/BoomTHDev/wear-pos-server/databases"
+	"github.com/BoomTHDev/golang_clean_arch/config"
+	"github.com/BoomTHDev/golang_clean_arch/databases"
+	"github.com/BoomTHDev/golang_clean_arch/middleware"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
 type fiberServer struct {
-	app  *fiber.App
-	db   databases.Database
-	conf *config.Config
+	app   *fiber.App
+	db    databases.Database
+	conf  *config.Config
+	redis databases.RedisClient
 }
 
 var (
-	once   sync.Once
-	server *fiberServer
+	once           sync.Once
+	serverInstance *fiberServer
 )
 
-func NewFiberServer(conf *config.Config, db databases.Database) *fiberServer {
+func NewFiberServer(conf *config.Config, db databases.Database, redis databases.RedisClient) *fiberServer {
 	fiberApp := fiber.New(fiber.Config{
-		BodyLimit:   conf.Server.BodyLimit,
-		IdleTimeout: time.Second * time.Duration(conf.Server.TimeOut),
+		BodyLimit:    conf.Server.BodyLimit,
+		IdleTimeout:  time.Second * time.Duration(conf.Server.TimeOut),
+		ErrorHandler: middleware.ErrorHandler(),
 	})
 
 	once.Do(func() {
-		server = &fiberServer{
-			app:  fiberApp,
-			db:   db,
-			conf: conf,
+		serverInstance = &fiberServer{
+			app:   fiberApp,
+			db:    db,
+			conf:  conf,
+			redis: redis,
 		}
 	})
 
-	return server
+	return serverInstance
 }
 
-func (s *fiberServer) Start() {
+func (s *fiberServer) setupRoutes() {
+	s.app.Use(logger.New())
 	s.app.Use(cors.New(cors.Config{
-		AllowOrigins: fmt.Sprintf("%v", s.conf.Server.AllowOrigins[0]),
+		AllowOrigins: strings.Join(s.conf.Server.AllowOrigins, ","),
 		AllowMethods: "GET, POST, PUT, DELETE",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
 
 	s.app.Get("/v1/health", s.healthCheck)
+	s.initUserRouter()
 
+	s.app.Use(func(ctx *fiber.Ctx) error {
+		return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"success": false,
+			"message": fmt.Sprintf("Sorry, endpoint %s %s not found", ctx.Method(), ctx.Path()),
+		})
+	})
+}
+
+func (s *fiberServer) Start() {
+	s.setupRoutes()
 	s.httpListening()
 }
 

@@ -1,15 +1,16 @@
 package main
 
 import (
-	"github.com/BoomTHDev/wear-pos-server/config"
-	"github.com/BoomTHDev/wear-pos-server/databases"
-	"github.com/BoomTHDev/wear-pos-server/server"
+	"github.com/BoomTHDev/golang_clean_arch/config"
+	"github.com/BoomTHDev/golang_clean_arch/databases"
+	"github.com/BoomTHDev/golang_clean_arch/server"
 )
 
 func main() {
 	cfg := config.ConfigGetting()
 	db := databases.NewPostgresDatabase(cfg.Database)
-	server := server.NewFiberServer(cfg, db)
+	redis := databases.NewRedisClient(cfg.Redis)
+	server := server.NewFiberServer(cfg, db, redis)
 
 	server.Start()
 }
